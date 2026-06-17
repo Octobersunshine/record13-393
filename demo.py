@@ -99,6 +99,32 @@ def main():
     except ValueError as e:
         print(f"捕获到预期异常: {e}")
 
+    print("\n")
+    print("=" * 60)
+    print("示例7: 数字 vs 字符串混排 (自动类型安全处理)")
+    print("=" * 60)
+    df_mixed = pd.DataFrame({
+        "category": ["A", "A", "B", "B", "A", "B"],
+        "code": [100, "50", 200, "300", 150, "abc"],
+    })
+    print("混排原始数据:")
+    print(df_mixed.to_string(index=False))
+
+    spec_mixed = SortSpec.from_list([
+        ("category", SortOrder.ASC),
+        ("code", SortOrder.ASC),
+    ])
+    result_mixed = MultiColumnSorter(df_mixed).sort(spec_mixed)
+    print("\ncategory 升序 + code 升序 (数字优先, 自动类型转换):")
+    print(result_mixed.to_string(index=False))
+
+    spec_mixed_desc = SortSpec.from_list([
+        ("code", SortOrder.DESC),
+    ])
+    result_mixed_desc = MultiColumnSorter(df_mixed).sort(spec_mixed_desc)
+    print("\ncode 降序:")
+    print(result_mixed_desc.to_string(index=False))
+
 
 if __name__ == "__main__":
     main()
