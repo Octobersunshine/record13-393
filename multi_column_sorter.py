@@ -18,20 +18,31 @@ class SortColumn:
     column: str
     order: SortOrder = SortOrder.ASC
     na_position: str = "last"
+    custom_order: Optional[List[Any]] = None
 
     def __post_init__(self):
         if self.na_position not in ("first", "last"):
             raise ValueError(
                 f"na_position must be 'first' or 'last', got '{self.na_position}'"
             )
+        if self.custom_order is not None and len(self.custom_order) == 0:
+            raise ValueError("custom_order must be a non-empty list if provided")
 
 
 @dataclass
 class SortSpec:
     columns: List[SortColumn] = field(default_factory=list)
 
-    def add(self, column: str, order: SortOrder = SortOrder.ASC, na_position: str = "last") -> "SortSpec":
-        self.columns.append(SortColumn(column=column, order=order, na_position=na_position))
+    def add(
+        self,
+        column: str,
+        order: SortOrder = SortOrder.ASC,
+        na_position: str = "last",
+        custom_order: Optional[List[Any]] = None,
+    ) -> "SortSpec":
+        self.columns.append(
+            SortColumn(column=column, order=order, na_position=na_position, custom_order=custom_order)
+        )
         return self
 
     @classmethod
@@ -44,9 +55,11 @@ class SortSpec:
                 instance.add(spec[0], spec[1])
             elif len(spec) == 3:
                 instance.add(spec[0], spec[1], spec[2])
+            elif len(spec) == 4:
+                instance.add(spec[0], spec[1], spec[2], spec[3])
             else:
                 raise ValueError(
-                    f"Each sort spec must be a tuple of 1-3 elements, got {len(spec)}"
+                    f"Each sort spec must be a tuple of 1-4 elements, got {len(spec)}"
                 )
         return instance
 
@@ -110,7 +123,11 @@ class MultiColumnSorter:
             ascending.append(sort_col.order is SortOrder.ASC)
             na_positions.append(sort_col.na_position)
 
-            if self._is_mixed_type(series):
+            if sort_col.custom_order is not None:
+                key_name = f"__sort_custom_{i}_{col}__"
+                temp_keys[key_name] = self._make_custom_order_key(series, sort_col)
+                by_columns.append(key_name)
+            elif self._is_mixed_type(series):
                 key_name = f"__sort_key_{i}_{col}__"
                 temp_keys[key_name] = self._make_type_safe_key(series, sort_col)
                 by_columns.append(key_name)
@@ -118,6 +135,21 @@ class MultiColumnSorter:
                 by_columns.append(col)
 
         return by_columns, ascending, na_positions, temp_keys
+
+    def _make_custom_order_key(self, series: pd.Series, sort_col: SortColumn) -> pd.Series:
+        order_map = {v: i for i, v in enumerate(sort_col.custom_order)}
+        fallback = len(sort_col.custom_order)
+
+        def _map_value(value: Any) -> float:
+            if pd.isna(value):
+                if sort_col.na_position == "first":
+                    return -1.0
+                return float(fallback + 1)
+            if value in order_map:
+                return float(order_map[value])
+            return float(fallback)
+
+        return series.apply(_map_value).rename(f"__custom_key_{sort_col.column}__")
 
     def _is_mixed_type(self, series: pd.Series) -> bool:
         if series.dtype != object:
@@ -205,6 +237,7 @@ def multi_sort(
     by: Optional[List[str]] = None,
     order: Optional[List[SortOrder]] = None,
     na_position: str = "last",
+    custom_orders: Optional[dict] = None,
 ) -> pd.DataFrame:
     spec = SortSpec()
 
@@ -220,6 +253,7 @@ def multi_sort(
         )
 
     for col, ord_ in zip(by, order):
-        spec.add(col, ord_, na_position)
+        co = custom_orders.get(col) if custom_orders else None
+        spec.add(col, ord_, na_position, co)
 
     return MultiColumnSorter(df).sort(spec)

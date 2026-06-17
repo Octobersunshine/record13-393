@@ -125,6 +125,86 @@ def main():
     print("\ncode 降序:")
     print(result_mixed_desc.to_string(index=False))
 
+    print("\n")
+    print("=" * 60)
+    print("示例8: 自定义排序 — 按\"高/中/低\"优先级排序")
+    print("=" * 60)
+    df_priority = pd.DataFrame({
+        "task": ["修复登录Bug", "优化首页加载", "重构数据库", "更新README", "设计新API", "编写单元测试"],
+        "priority": ["高", "中", "低", "中", "高", "低"],
+        "assignee": ["Alice", "Bob", "Charlie", "Diana", "Eve", "Frank"],
+    })
+    print("原始数据:")
+    print(df_priority.to_string(index=False))
+
+    spec_custom = SortSpec.from_list([
+        ("priority", SortOrder.ASC, "last", ["高", "中", "低"]),
+    ])
+    result_custom = MultiColumnSorter(df_priority).sort(spec_custom)
+    print('\n按 priority 自定义排序 (高→中→低):')
+    print(result_custom.to_string(index=False))
+
+    print("\n")
+    print("=" * 60)
+    print("示例9: 自定义排序 + 普通排序组合")
+    print("=" * 60)
+    spec_combo = SortSpec.from_list([
+        ("priority", SortOrder.ASC, "last", ["高", "中", "低"]),
+        ("assignee", SortOrder.ASC),
+    ])
+    result_combo = MultiColumnSorter(df_priority).sort(spec_combo)
+    print("priority 自定义排序(高→中→低) + assignee 字母序:")
+    print(result_combo.to_string(index=False))
+
+    print("\n")
+    print("=" * 60)
+    print("示例10: 链式自定义排序 + 降序反转")
+    print("=" * 60)
+    spec_chain_custom = SortSpec() \
+        .add("priority", SortOrder.DESC, "last", ["低", "中", "高"]) \
+        .add("assignee", SortOrder.ASC)
+    result_chain = MultiColumnSorter(df_priority).sort(spec_chain_custom)
+    print("priority 降序(高→中→低) + assignee 字母序:")
+    print(result_chain.to_string(index=False))
+
+    print("\n")
+    print("=" * 60)
+    print("示例11: multi_sort 快捷函数 + custom_orders")
+    print("=" * 60)
+    result_multi_custom = multi_sort(
+        df_priority,
+        by=["priority", "assignee"],
+        order=[SortOrder.ASC, SortOrder.ASC],
+        custom_orders={"priority": ["高", "中", "低"]},
+    )
+    print("priority 自定义排序(高→中→低) + assignee 字母序:")
+    print(result_multi_custom.to_string(index=False))
+
+    print("\n")
+    print("=" * 60)
+    print("示例12: 自定义排序含未列出值和 NaN")
+    print("=" * 60)
+    df_unlisted = pd.DataFrame({
+        "level": ["S", "A", "B", "C", "D", "SS", np.nan, "A"],
+        "score": [95, 80, 70, 60, 50, 99, 0, 85],
+    })
+    print("原始数据:")
+    print(df_unlisted.to_string(index=False))
+
+    spec_unlisted = SortSpec.from_list([
+        ("level", SortOrder.ASC, "last", ["SS", "S", "A", "B", "C", "D"]),
+    ])
+    result_unlisted = MultiColumnSorter(df_unlisted).sort(spec_unlisted)
+    print("\nlevel 自定义排序(SS→S→A→B→C→D, 未列出值在后, NaN 在末尾):")
+    print(result_unlisted.to_string(index=False))
+
+    spec_unlisted_first = SortSpec.from_list([
+        ("level", SortOrder.ASC, "first", ["SS", "S", "A", "B", "C", "D"]),
+    ])
+    result_unlisted_first = MultiColumnSorter(df_unlisted).sort(spec_unlisted_first)
+    print("\nlevel 自定义排序(NaN 在开头, 未列出值在自定义值之后):")
+    print(result_unlisted_first.to_string(index=False))
+
 
 if __name__ == "__main__":
     main()
